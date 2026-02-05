@@ -4,13 +4,13 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquare, Send, X, Loader2, Bot, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
-import ReactMarkdown from 'react-markdown';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
+
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 export function AIChatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,58 +34,55 @@ export function AIChatbot() {
     setIsLoading(true);
 
     try {
-      const response = await supabase.functions.invoke('chat', {
-        body: { messages: [...messages, userMessage] },
+      const response = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ messages: [...messages, userMessage] }),
       });
 
-      if (response.error) {
-        throw new Error(response.error.message);
+      if (!response.ok) {
+        throw new Error('Failed to get response');
       }
 
-      // Handle streaming response
-      const reader = response.data.getReader?.();
-      if (reader) {
-        let assistantContent = '';
-        const decoder = new TextDecoder();
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No reader available');
+      }
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+      let assistantContent = '';
+      const decoder = new TextDecoder();
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-          for (const line of lines) {
-            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-              try {
-                const json = JSON.parse(line.slice(6));
-                const content = json.choices?.[0]?.delta?.content;
-                if (content) {
-                  assistantContent += content;
-                  setMessages((prev) => {
-                    const last = prev[prev.length - 1];
-                    if (last?.role === 'assistant') {
-                      return prev.map((m, i) =>
-                        i === prev.length - 1 ? { ...m, content: assistantContent } : m
-                      );
-                    }
-                    return [...prev, { role: 'assistant', content: assistantContent }];
-                  });
-                }
-              } catch {
-                // Skip invalid JSON
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            try {
+              const json = JSON.parse(line.slice(6));
+              const content = json.choices?.[0]?.delta?.content;
+              if (content) {
+                assistantContent += content;
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1];
+                  if (last?.role === 'assistant') {
+                    return prev.map((m, i) =>
+                      i === prev.length - 1 ? { ...m, content: assistantContent } : m
+                    );
+                  }
+                  return [...prev, { role: 'assistant', content: assistantContent }];
+                });
               }
+            } catch {
+              // Skip invalid JSON
             }
           }
-        }
-      } else {
-        // Non-streaming fallback
-        const data = response.data;
-        if (data?.choices?.[0]?.message?.content) {
-          setMessages((prev) => [
-            ...prev,
-            { role: 'assistant', content: data.choices[0].message.content },
-          ]);
         }
       }
     } catch (error) {
@@ -106,8 +103,7 @@ export function AIChatbot() {
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50",
-          "bg-primary hover:bg-primary/90 text-primary-foreground",
-          isOpen && "rotate-0"
+          "bg-primary hover:bg-primary/90 text-primary-foreground"
         )}
         size="icon"
       >
@@ -137,61 +133,61 @@ export function AIChatbot() {
         </div>
 
         {/* Messages */}
-        <ScrollArea ref={scrollRef} className="flex-1 p-4">
-          {messages.length === 0 ? (
-            <div className="text-center text-muted-foreground text-sm py-8">
-              <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Hi! I'm your AI assistant.</p>
-              <p className="mt-1">Ask me to suggest tasks or help with anything!</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "flex gap-3",
-                    msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                  )}
-                >
+        <ScrollArea className="flex-1 p-4">
+          <div ref={scrollRef}>
+            {messages.length === 0 ? (
+              <div className="text-center text-muted-foreground text-sm py-8">
+                <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Hi! I&apos;m your AI assistant.</p>
+                <p className="mt-1">Ask me to suggest tasks or help with anything!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((msg, i) => (
                   <div
+                    key={i}
                     className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
-                      msg.role === 'user' ? 'bg-primary' : 'bg-secondary'
+                      "flex gap-3",
+                      msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                     )}
                   >
-                    {msg.role === 'user' ? (
-                      <User className="w-4 h-4 text-primary-foreground" />
-                    ) : (
-                      <Bot className="w-4 h-4 text-foreground" />
-                    )}
-                  </div>
-                  <div
-                    className={cn(
-                      "px-4 py-2 rounded-2xl max-w-[80%]",
-                      msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-secondary text-foreground'
-                    )}
-                  >
-                    <div className="prose prose-sm prose-invert max-w-none">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <div
+                      className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
+                        msg.role === 'user' ? 'bg-primary' : 'bg-secondary'
+                      )}
+                    >
+                      {msg.role === 'user' ? (
+                        <User className="w-4 h-4 text-primary-foreground" />
+                      ) : (
+                        <Bot className="w-4 h-4 text-foreground" />
+                      )}
+                    </div>
+                    <div
+                      className={cn(
+                        "px-4 py-2 rounded-2xl max-w-[80%]",
+                        msg.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-foreground'
+                      )}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     </div>
                   </div>
-                </div>
-              ))}
-              {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-foreground" />
+                ))}
+                {isLoading && messages[messages.length - 1]?.role === 'user' && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-foreground" />
+                    </div>
+                    <div className="px-4 py-2 rounded-2xl bg-secondary">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
                   </div>
-                  <div className="px-4 py-2 rounded-2xl bg-secondary">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </ScrollArea>
 
         {/* Input */}
