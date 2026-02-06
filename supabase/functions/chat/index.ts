@@ -11,11 +11,28 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, tasks } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    // Build context about user's tasks
+    let taskContext = "";
+    if (tasks && tasks.length > 0) {
+      const todoTasks = tasks.filter((t: { status: string }) => t.status === "todo");
+      const inProgressTasks = tasks.filter((t: { status: string }) => t.status === "in_progress");
+      const doneTasks = tasks.filter((t: { status: string }) => t.status === "done");
+      
+      taskContext = `
+The user currently has ${tasks.length} tasks:
+- To Do: ${todoTasks.length} tasks
+- In Progress: ${inProgressTasks.length} tasks
+- Done: ${doneTasks.length} tasks
+
+Task titles: ${tasks.map((t: { title: string }) => t.title).join(", ")}
+`;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -29,13 +46,24 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a helpful AI assistant integrated into a Kanban task management app. You can help users with:
+            content: `You are a helpful AI assistant integrated into TaskFlow, a Kanban task management app. You can help users with:
 1. Suggesting new tasks based on their goals or projects
 2. Answering general questions
 3. Providing productivity tips
 4. Helping organize and prioritize work
 
-Keep responses concise and actionable. When suggesting tasks, format them clearly with titles and descriptions.`,
+${taskContext}
+
+IMPORTANT: Users can manage tasks directly through natural language commands like:
+- "Create a task called [name]" - Creates a new task
+- "Add 🚀 to [task name]" - Adds emoji to a task
+- "Move [task] to done" - Changes task status
+- "Delete [task name]" - Removes a task
+- "Show my tasks" - Lists all tasks
+
+When users ask to create, move, or delete tasks, acknowledge that these commands are handled automatically and describe what was done.
+
+Keep responses concise and actionable. When suggesting tasks, format them clearly with titles.`,
           },
           ...messages,
         ],
