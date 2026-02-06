@@ -1,31 +1,40 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Task, CreateTaskInput, TaskStatus } from '@/types/task';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export function useTasks() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['tasks'],
+    queryKey: ['tasks', user?.id],
     queryFn: async () => {
+      if (!user) return [];
+      
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
+        .eq('user_id', user.id)
         .order('position', { ascending: true });
 
       if (error) throw error;
       return data as Task[];
     },
+    enabled: !!user,
   });
 
   const createTask = useMutation({
     mutationFn: async (input: CreateTaskInput) => {
+      if (!user) throw new Error('Not authenticated');
+      
       const maxPosition = Math.max(0, ...tasks.map(t => t.position)) + 1;
       const { data, error } = await supabase
         .from('tasks')
         .insert({
           ...input,
+          user_id: user.id,
           position: maxPosition,
           tags: input.tags || [],
         })
@@ -36,7 +45,7 @@ export function useTasks() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
       toast.success('Task created');
     },
     onError: () => {
@@ -57,7 +66,7 @@ export function useTasks() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
     },
     onError: () => {
       toast.error('Failed to update task');
@@ -70,7 +79,7 @@ export function useTasks() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
       toast.success('Task deleted');
     },
     onError: () => {
@@ -91,7 +100,7 @@ export function useTasks() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
     },
   });
 
