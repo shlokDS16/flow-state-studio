@@ -2,7 +2,7 @@ import { AppSidebar } from '@/components/layout/AppSidebar';
 import { Header } from '@/components/layout/Header';
 import { AIChatbot } from '@/components/chat/AIChatbot';
 import { useTasks } from '@/hooks/useTasks';
-import { TaskCard } from '@/components/kanban/TaskCard';
+import { FavoriteTaskCard } from '@/components/kanban/FavoriteTaskCard';
 import { Star } from 'lucide-react';
 
 export default function Favorites() {
@@ -39,11 +39,10 @@ export default function Favorites() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {favoriteTasks.map((task) => (
-                <TaskCard
+                <FavoriteTaskCard
                   key={task.id}
                   task={task}
                   onDelete={() => deleteTask.mutate(task.id)}
-                  onDragStart={() => {}}
                 />
               ))}
             </div>

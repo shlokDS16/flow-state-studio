@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CreateTaskInput, TaskPriority, TaskStatus } from '@/types/task';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
+import { parseTimeEstimate } from '@/lib/date-utils';
 
 interface AddTaskDialogProps {
   open: boolean;
@@ -21,6 +22,7 @@ export function AddTaskDialog({ open, onOpenChange, onSubmit, defaultStatus }: A
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [dueDate, setDueDate] = useState('');
+  const [timeEstimate, setTimeEstimate] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
@@ -28,12 +30,15 @@ export function AddTaskDialog({ open, onOpenChange, onSubmit, defaultStatus }: A
     e.preventDefault();
     if (!title.trim()) return;
 
+    const parsedTime = parseTimeEstimate(timeEstimate);
+
     onSubmit({
       title: title.trim(),
       description: description.trim() || undefined,
       priority,
       status: defaultStatus,
       due_date: dueDate || undefined,
+      time_estimate: parsedTime || undefined,
       tags,
     });
 
@@ -42,6 +47,7 @@ export function AddTaskDialog({ open, onOpenChange, onSubmit, defaultStatus }: A
     setDescription('');
     setPriority('medium');
     setDueDate('');
+    setTimeEstimate('');
     setTags([]);
     setTagInput('');
     onOpenChange(false);
@@ -67,12 +73,12 @@ export function AddTaskDialog({ open, onOpenChange, onSubmit, defaultStatus }: A
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">Title (with emoji support 🎉)</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter task title..."
+              placeholder="🚀 Enter task title..."
               className="bg-secondary border-border"
               required
             />
@@ -98,9 +104,9 @@ export function AddTaskDialog({ open, onOpenChange, onSubmit, defaultStatus }: A
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="low">🟢 Personal</SelectItem>
+                  <SelectItem value="medium">🟡 Work</SelectItem>
+                  <SelectItem value="high">🔴 Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -115,6 +121,17 @@ export function AddTaskDialog({ open, onOpenChange, onSubmit, defaultStatus }: A
                 className="bg-secondary border-border"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="timeEstimate">Time Estimate</Label>
+            <Input
+              id="timeEstimate"
+              value={timeEstimate}
+              onChange={(e) => setTimeEstimate(e.target.value)}
+              placeholder="e.g., 2h, 30m, 1h 30m"
+              className="bg-secondary border-border"
+            />
           </div>
 
           <div className="space-y-2">

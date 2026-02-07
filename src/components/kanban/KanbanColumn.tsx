@@ -3,7 +3,7 @@ import { TaskCard } from './TaskCard';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { Droppable, Draggable } from '@hello-pangea/dnd';
 
 interface KanbanColumnProps {
   title: string;
@@ -11,9 +11,6 @@ interface KanbanColumnProps {
   tasks: Task[];
   onAddTask: (status: TaskStatus) => void;
   onDeleteTask: (id: string) => void;
-  onDragStart: (e: React.DragEvent, task: Task) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent, status: TaskStatus) => void;
   colorClass: string;
 }
 
@@ -23,39 +20,10 @@ export function KanbanColumn({
   tasks,
   onAddTask,
   onDeleteTask,
-  onDragStart,
-  onDragOver,
-  onDrop,
   colorClass,
 }: KanbanColumnProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-    onDragOver(e);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    setIsDragOver(false);
-    onDrop(e, status);
-  };
-
   return (
-    <div
-      className={cn(
-        "flex flex-col bg-secondary/30 rounded-xl min-w-[320px] max-w-[350px] flex-1",
-        "transition-all duration-200",
-        isDragOver && "ring-2 ring-primary/50 bg-secondary/50"
-      )}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div className="flex flex-col bg-secondary/30 rounded-xl min-w-[320px] max-w-[350px] flex-1">
       {/* Column Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -74,23 +42,39 @@ export function KanbanColumn({
         </Button>
       </div>
 
-      {/* Tasks List */}
-      <div className="flex-1 p-2 space-y-3 overflow-y-auto scrollbar-thin max-h-[calc(100vh-200px)]">
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onDelete={onDeleteTask}
-            onDragStart={onDragStart}
-          />
-        ))}
-        
-        {tasks.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            No tasks yet
+      {/* Droppable Tasks List */}
+      <Droppable droppableId={status}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={cn(
+              "flex-1 p-2 space-y-3 overflow-y-auto scrollbar-thin max-h-[calc(100vh-200px)] min-h-[200px] transition-colors duration-200",
+              snapshot.isDraggingOver && "bg-primary/5 ring-2 ring-inset ring-primary/20 rounded-lg"
+            )}
+          >
+            {tasks.map((task, index) => (
+              <Draggable key={task.id} draggableId={task.id} index={index}>
+                {(provided, snapshot) => (
+                  <TaskCard
+                    task={task}
+                    onDelete={onDeleteTask}
+                    provided={provided}
+                    isDragging={snapshot.isDragging}
+                  />
+                )}
+              </Draggable>
+            ))}
+            {provided.placeholder}
+            
+            {tasks.length === 0 && !snapshot.isDraggingOver && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No tasks yet
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </Droppable>
     </div>
   );
 }

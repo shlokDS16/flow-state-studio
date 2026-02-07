@@ -1,32 +1,62 @@
 import { Task } from '@/types/task';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Calendar, GripVertical, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { Calendar, Clock, GripVertical, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { formatSmartDate, formatTimeEstimate } from '@/lib/date-utils';
+import { DraggableProvided } from '@hello-pangea/dnd';
 
 interface TaskCardProps {
   task: Task;
   onDelete: (id: string) => void;
-  onDragStart: (e: React.DragEvent, task: Task) => void;
+  provided: DraggableProvided;
+  isDragging?: boolean;
 }
 
 const priorityConfig = {
-  high: { label: 'High Priority', className: 'bg-priority-high/20 text-priority-high border-priority-high/30' },
-  medium: { label: 'Important', className: 'bg-priority-medium/20 text-priority-medium border-priority-medium/30' },
-  low: { label: 'Low Priority', className: 'bg-priority-low/20 text-priority-low border-priority-low/30' },
+  high: { 
+    label: 'Urgent', 
+    className: 'bg-priority-high/20 text-[hsl(var(--priority-high))] border-priority-high/30' 
+  },
+  medium: { 
+    label: 'Work', 
+    className: 'bg-priority-medium/20 text-[hsl(var(--priority-medium))] border-priority-medium/30' 
+  },
+  low: { 
+    label: 'Personal', 
+    className: 'bg-priority-low/20 text-[hsl(var(--priority-low))] border-priority-low/30' 
+  },
 };
 
-export function TaskCard({ task, onDelete, onDragStart }: TaskCardProps) {
+// Extract emoji from the beginning of title
+function extractEmoji(title: string): { emoji: string | null; cleanTitle: string } {
+  const emojiRegex = /^([\p{Emoji}\u200d]+)\s*/u;
+  const match = title.match(emojiRegex);
+  if (match) {
+    return {
+      emoji: match[1],
+      cleanTitle: title.slice(match[0].length),
+    };
+  }
+  return { emoji: null, cleanTitle: title };
+}
+
+export function TaskCard({ task, onDelete, provided, isDragging }: TaskCardProps) {
+  const { emoji, cleanTitle } = extractEmoji(task.title);
+  const smartDate = formatSmartDate(task.due_date);
+  const timeDisplay = formatTimeEstimate(task.time_estimate);
+
   return (
     <Card
-      draggable
-      onDragStart={(e) => onDragStart(e, task)}
+      ref={provided.innerRef}
+      {...provided.draggableProps}
+      {...provided.dragHandleProps}
       className={cn(
         "p-4 bg-card border-border/50 cursor-grab active:cursor-grabbing",
         "hover:border-primary/30 transition-all duration-200",
-        "group relative"
+        "group relative select-none",
+        isDragging && "opacity-90 shadow-xl ring-2 ring-primary/50 rotate-[2deg]"
       )}
     >
       <div className="flex items-start gap-2">
@@ -41,9 +71,10 @@ export function TaskCard({ task, onDelete, onDragStart }: TaskCardProps) {
             {priorityConfig[task.priority].label}
           </Badge>
 
-          {/* Title */}
-          <h3 className="font-semibold text-foreground mb-1 line-clamp-2">
-            {task.title}
+          {/* Title with Emoji */}
+          <h3 className="font-semibold text-foreground mb-1 line-clamp-2 flex items-center gap-1.5">
+            {emoji && <span className="text-lg">{emoji}</span>}
+            <span>{cleanTitle}</span>
           </h3>
 
           {/* Description */}
@@ -68,16 +99,22 @@ export function TaskCard({ task, onDelete, onDragStart }: TaskCardProps) {
             </div>
           )}
 
-          {/* Footer */}
+          {/* Footer with metadata */}
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            {task.due_date ? (
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                <span>{format(new Date(task.due_date), 'MMM d')}</span>
-              </div>
-            ) : (
-              <span />
-            )}
+            <div className="flex items-center gap-3">
+              {smartDate && (
+                <div className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  <span>{smartDate}</span>
+                </div>
+              )}
+              {timeDisplay && (
+                <div className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  <span>{timeDisplay}</span>
+                </div>
+              )}
+            </div>
             
             <Button
               variant="ghost"

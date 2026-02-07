@@ -89,15 +89,38 @@ export function useTasks() {
 
   const moveTask = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: TaskStatus }) => {
+      // Get the max position in the destination column
+      const destTasks = tasks.filter(t => t.status === status);
+      const newPosition = destTasks.length > 0 
+        ? Math.max(...destTasks.map(t => t.position)) + 1 
+        : 0;
+      
       const { data, error } = await supabase
         .from('tasks')
-        .update({ status })
+        .update({ status, position: newPosition })
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
+    },
+  });
+
+  const reorderTasks = useMutation({
+    mutationFn: async ({ status, taskIds }: { status: TaskStatus; taskIds: string[] }) => {
+      // Update positions for all tasks in the column
+      const updates = taskIds.map((id, index) => 
+        supabase
+          .from('tasks')
+          .update({ position: index })
+          .eq('id', id)
+      );
+      
+      await Promise.all(updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', user?.id] });
@@ -111,5 +134,6 @@ export function useTasks() {
     updateTask,
     deleteTask,
     moveTask,
+    reorderTasks,
   };
 }

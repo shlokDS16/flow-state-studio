@@ -8,6 +8,7 @@ export interface Task {
   priority: TaskPriority;
   status: TaskStatus;
   due_date: string | null;
+  time_estimate: number | null;
   tags: string[];
   position: number;
   created_at: string;
@@ -20,5 +21,6 @@ export interface CreateTaskInput {
   priority?: TaskPriority;
   status?: TaskStatus;
   due_date?: string;
+  time_estimate?: number;
   tags?: string[];
 }
